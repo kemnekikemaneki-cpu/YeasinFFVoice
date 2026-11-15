@@ -11,35 +11,16 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
       - name: Arrange project
         run: |
-          mkdir -p app/src/main/java/com/yasin/ffvoice app/src/main/res/values app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26
+          mkdir -p app/src/main/java/com/yasin/ffvoice app/src/main/res/values app/src/main/res/mipmap-xxxhdpi app/src/main/res/drawable-nodpi
           mv MainActivity.kt OverlayService.kt Store.kt app/src/main/java/com/yasin/ffvoice/
           mv AndroidManifest.xml app/src/main/
           mv strings.xml app/src/main/res/values/
           sed -i 's|<application |<application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" |' app/src/main/AndroidManifest.xml
-          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'EOF'
-          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@drawable/ic_bg"/>
-              <foreground android:drawable="@drawable/ic_fg"/>
-          </adaptive-icon>
-          EOF
-          cat > app/src/main/res/drawable/ic_bg.xml <<'EOF'
-          <shape xmlns:android="http://schemas.android.com/apk/res/android">
-              <gradient android:startColor="#1A0F2E" android:endColor="#0D0D14" android:angle="45"/>
-          </shape>
-          EOF
-          cat > app/src/main/res/drawable/ic_fg.xml <<'EOF'
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="108dp" android:height="108dp"
-              android:viewportWidth="108" android:viewportHeight="108">
-              <path android:fillColor="#E53935"
-                  android:pathData="M54,28 a26,26 0 1 0 0.01,0 z"/>
-              <path android:fillColor="#FFFFFF"
-                  android:pathData="M48,40 h12 a6,6 0 0 1 6,6 v10 a6,6 0 0 1 -6,6 h-12 a6,6 0 0 1 -6,-6 v-10 a6,6 0 0 1 6,-6 z"/>
-              <path android:fillColor="#00000000" android:strokeColor="#FFFFFF"
-                  android:strokeWidth="3" android:strokeLineCap="round"
-                  android:pathData="M40,56 a14,14 0 0 0 28,0 M54,70 v6 M48,76 h12"/>
-          </vector>
-          EOF
+          which convert || sudo apt-get install -y imagemagick
+          SRC=$(ls icon.png icon.jpg icon.jpeg 2>/dev/null | head -1)
+          [ -n "$SRC" ] || { echo "icon file missing"; exit 1; }
+          convert "$SRC" -resize 512x512^ -gravity center -extent 512x512 app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/drawable-nodpi/logo.png
           cat > app/build.gradle.kts <<'EOF'
           plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
           android {
