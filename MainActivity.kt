@@ -4,31 +4,87 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.Gravity
 import android.widget.*
 
 class MainActivity : Activity() {
     private lateinit var list: LinearLayout
     private val PICK = 1
+    private val BG = Color.parseColor("#0D0D14")
+    private val CARD = Color.parseColor("#1B1B2B")
+    private val RED = Color.parseColor("#E53935")
+    private val PURPLE = Color.parseColor("#7C4DFF")
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    private fun shape(color: Int, r: Int) = GradientDrawable().apply {
+        setColor(color); cornerRadius = dp(r).toFloat()
+    }
+
+    private fun gradient(a: Int, b: Int, r: Int) =
+        GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(a, b)).apply {
+            cornerRadius = dp(r).toFloat()
+        }
+
+    private fun pill(label: String, a: Int, b: Int, onClick: () -> Unit) = TextView(this).apply {
+        text = label; setTextColor(Color.WHITE); textSize = 13f
+        typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
+        setPadding(dp(8), dp(12), dp(8), dp(12))
+        background = gradient(a, b, 14)
+        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            .apply { setMargins(dp(4), 0, dp(4), 0) }
+        setOnClickListener { onClick() }
+    }
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
+        window.statusBarColor = BG
+        window.navigationBarColor = BG
         if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 0)
-        val p = (16 * resources.displayMetrics.density).toInt()
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(p, p * 2, p, p) }
-        root.addView(TextView(this).apply { text = "YASIN FF VOICE"; textSize = 24f; setTextColor(Color.BLACK) })
-        val row = LinearLayout(this)
-        row.addView(Button(this).apply { text = "+ Add voice"; setOnClickListener { pick() } })
-        row.addView(Button(this).apply { text = "Overlay ON"; setOnClickListener { startOverlay() } })
-        row.addView(Button(this).apply { text = "Overlay OFF"; setOnClickListener { stopService(Intent(this@MainActivity, OverlayService::class.java)) } })
-        root.addView(row)
-        root.addView(TextView(this).apply {
-            text = "ট্যাপ = বাজবে, আবার ট্যাপ = থামবে। লং-প্রেস = নাম বদল/ডিলিট।\nগেমে শোনাতে ফোনের মিডিয়া ভলিউম বেশি রাখুন।"
-            textSize = 12f
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(BG)
+            setPadding(dp(16), dp(40), dp(16), dp(16))
+        }
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = gradient(RED, PURPLE, 20)
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+        }
+        header.addView(TextView(this).apply {
+            text = "🎤 YASIN FF VOICE"; textSize = 24f
+            setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
         })
+        header.addView(TextView(this).apply {
+            text = "Your voice. Your soundboard."; textSize = 13f
+            setTextColor(Color.parseColor("#DDFFFFFF"))
+        })
+        root.addView(header)
+
+        val row = LinearLayout(this).apply {
+            setPadding(0, dp(14), 0, dp(6))
+        }
+        row.addView(pill("+ ADD VOICE", PURPLE, Color.parseColor("#536DFE")) { pick() })
+        row.addView(pill("OVERLAY ON", Color.parseColor("#2E7D32"), Color.parseColor("#43A047")) { startOverlay() })
+        row.addView(pill("OVERLAY OFF", Color.parseColor("#B71C1C"), RED) {
+            stopService(Intent(this@MainActivity, OverlayService::class.java))
+        })
+        root.addView(row)
+
+        root.addView(TextView(this).apply {
+            text = "ট্যাপ = বাজবে, আবার ট্যাপ = থামবে • লং-প্রেস = নাম বদল/ডিলিট\nগেমে শোনাতে ফোনের মিডিয়া ভলিউম বেশি রাখুন"
+            textSize = 11f; setTextColor(Color.parseColor("#8888AA"))
+            setPadding(dp(4), dp(4), dp(4), dp(10))
+        })
+
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(ScrollView(this).apply { addView(list) })
         setContentView(root)
@@ -69,14 +125,44 @@ class MainActivity : Activity() {
     private fun refresh() {
         list.removeAllViews()
         val voices = Store.load(this)
-        if (voices.isEmpty()) list.addView(TextView(this).apply { text = "\nএখনো কোনো ভয়েস নেই। \"+ Add voice\" চাপুন।" })
+        if (voices.isEmpty()) {
+            list.addView(TextView(this).apply {
+                text = "\nএখনো কোনো ভয়েস নেই।\n\"+ ADD VOICE\" চেপে অডিও যোগ করুন।"
+                setTextColor(Color.parseColor("#8888AA")); gravity = Gravity.CENTER
+                setPadding(0, dp(40), 0, 0)
+            })
+        }
         voices.forEach { v ->
-            val btn = Button(this).apply {
-                text = "▶  ${v.name}"; isAllCaps = false
-                setOnClickListener { Player.toggle(this@MainActivity, v) { runOnUiThread { } } }
+            val playing = Player.currentId == v.id
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = GradientDrawable().apply {
+                    setColor(if (playing) Color.parseColor("#2A1B2B") else CARD)
+                    cornerRadius = dp(16).toFloat()
+                    setStroke(dp(2), if (playing) RED else Color.TRANSPARENT)
+                }
+                setPadding(dp(14), dp(14), dp(14), dp(14))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 0, 0, dp(10)) }
+                setOnClickListener {
+                    Player.toggle(this@MainActivity, v) { runOnUiThread { refresh() } }
+                    refresh()
+                }
                 setOnLongClickListener { options(v); true }
             }
-            list.addView(btn)
+            card.addView(TextView(this).apply {
+                text = if (playing) "⏸" else "▶"
+                setTextColor(Color.WHITE); textSize = 16f; gravity = Gravity.CENTER
+                background = shape(if (playing) RED else PURPLE, 24)
+                layoutParams = LinearLayout.LayoutParams(dp(44), dp(44)).apply { setMargins(0, 0, dp(14), 0) }
+            })
+            card.addView(TextView(this).apply {
+                text = v.name; setTextColor(Color.WHITE); textSize = 15f
+                typeface = Typeface.DEFAULT_BOLD; maxLines = 2
+            })
+            list.addView(card)
         }
     }
 
